@@ -1,134 +1,251 @@
-// TODO:
-// get the coordinates of the snake and the fruit on the GRID_SIZE 20x20
-// if they are both on the same coordinates, it means the fruit was eaten
-// move the fruit
-
 const canvas = document.querySelector("canvas");
 const ctx = canvas.getContext("2d");
-canvas.width = 500;
-canvas.height = 500;
+canvas.width = 26 * 21;
+canvas.height = 26 * 21;
 
 let rafid;
-const CELL_SIZE = 25;
+const CELL_SIZE = 26;
 const GRID_SIZE = canvas.width / CELL_SIZE;
+const initialTail = 2;
 
-let interval = 0.3;
+let interval = 0.1;
 let buttonPressed = false;
+let gameover = false;
+let fruitsEaten = 0;
+let freeCells = [];
 
 const snake = {
   x: Math.floor(GRID_SIZE / 2),
   y: Math.floor(GRID_SIZE / 2),
-  dx: 1,
-  dy: 0,
-  color: "#fe5424",
-  moved: false,
-  tail: null,
+  px: null,
+  py: null,
+  dir: "right",
+  tails: [],
 };
+
+updateFreeCells(); // initailly fill the free spaces
 
 const fruit = {
-  x: Math.floor(GRID_SIZE / 2),
-  y: Math.floor(GRID_SIZE / 2),
-  color: "#76D2DB",
-  placed: false,
+  x: randomFreeCell()[0],
+  y: randomFreeCell()[1],
 };
 
-function moveSnake(x, y) {
-  snake.moved = false;
-  snake.x += x * CELL_SIZE;
-  snake.y += y * CELL_SIZE;
-  snake.moved = true;
-}
-
-function moveFruit() {
-  fruit.x = Math.floor(Math.random() * GRID_SIZE);
-  fruit.y = Math.floor(Math.random() * GRID_SIZE);
-}
-
-function draw(color, x, y, w = CELL_SIZE, h = CELL_SIZE) {
-  ctx.fillStyle = color;
-  ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, w, h);
-}
-
-function clear() {
-  ctx.lineWidth = 1;
-  ctx.strokeStyle = "#333333";
-  ctx.fillStyle = "#000000";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  for (let i = 0; i < canvas.width / CELL_SIZE; i++) {
-    for (let j = 0; j < canvas.width / CELL_SIZE; j++) {
-      ctx.strokeRect(i * CELL_SIZE, j * CELL_SIZE, CELL_SIZE, CELL_SIZE);
-    }
-  }
-}
-
-window.addEventListener("keydown", (e) => {
-  if (buttonPressed) return;
-  const key = e.key;
-  switch (key) {
-    case "ArrowLeft":
-      if (snake.dx !== 1) {
-        snake.dx = -1;
-        snake.dy = 0;
-        buttonPressed = true;
-      }
-      break;
-    case "ArrowRight":
-      if (snake.dx !== -1) {
-        snake.dx = 1;
-        snake.dy = 0;
-        buttonPressed = true;
-      }
-      break;
-    case "ArrowUp":
-      if (snake.dy !== 1) {
-        snake.dx = 0;
-        snake.dy = -1;
-        buttonPressed = true;
-      }
-      break;
-    case "ArrowDown":
-      if (snake.dy !== -1) {
-        snake.dx = 0;
-        snake.dy = 1;
-        buttonPressed = true;
-      }
-      break;
-  }
-});
-
-clear();
 let lastTime = 0;
 let timer = 0;
-function loop(timestamp) {
-  clear();
+
+// CONTROLS
+
+// movements
+window.addEventListener("keydown", (e) => {
+  let dir;
+  if (buttonPressed) return;
+  console.log(e.key === "w");
+  switch (e.key) {
+    case "ArrowRight":
+    case "d":
+    case "D":
+      if (snake.dir === "left") return;
+      dir = "right";
+      break;
+    case "ArrowLeft":
+    case "a":
+    case "A":
+      if (snake.dir === "right") return;
+      dir = "left";
+      break;
+    case "ArrowUp":
+    case "w":
+    case "W":
+      if (snake.dir === "down") return;
+      dir = "up";
+      break;
+    case "ArrowDown":
+    case "s":
+    case "S":
+      if (snake.dir === "up") return;
+      dir = "down";
+      console.log("changed");
+      break;
+  }
+
+  if (!dir) return;
+
+  buttonPressed = true;
+  snake.dir = dir;
+});
+
+// MAIN LOOP
+let loopCount = 0;
+function main(timestamp) {
+  clearScreen();
+  // ---- DELTA TIME
   const dt = (timestamp - lastTime) / 1000;
   lastTime = timestamp;
   if (dt) {
     timer += dt;
   }
 
-  // will only run on initial render
-  if (!fruit.placed) {
-    moveFruit();
-    fruit.placed = true;
-  }
-
+  // ---- LOGICS
   if (timer >= interval) {
-    timer -= interval;
-    moveSnake(snake.dx / CELL_SIZE, snake.dy / CELL_SIZE);
-    buttonPressed = false;
-    // if the fruit is eaten;
-    if (snake.x === fruit.x && snake.y === fruit.y) {
-      moveFruit();
+    timer = 0;
+    if (outOfBounds(snake.x, snake.y)) {
+      gameover = true;
+      console.log("YOU DIED!");
+    } else {
+      if (!gameover) {
+        autoMove(snake, snake.dir);
+        buttonPressed = false;
+        for (let i = 0; i < snake.tails.length; i++) {
+          const t = snake.tails[i];
+          const head = i === 0 ? snake : snake.tails[i - 1];
+          t.x = head.px;
+          t.y = head.py;
+        }
 
-      if (interval > 0.1) interval -= 0.025;
+        if (collisionWithTail()) {
+          gameover = true;
+          console.log("You bit your own tail, you dummy");
+        }
+
+        if (loopCount < initialTail) {
+          addTail();
+          loopCount++;
+        }
+      }
+    }
+
+    if (fruitEaten()) {
+      addTail();
+      updateFreeCells();
+      moveFruit();
+      fruitsEaten++;
+      if (fruitsEaten > 0 && fruitsEaten % 1 === 0) {
+        speedUp();
+      }
+    }
+
+    snake.px = snake.x;
+    snake.py = snake.y;
+
+    for (let i = 0; i < snake.tails.length; i++) {
+      const t = snake.tails[i];
+      t.px = t.x;
+      t.py = t.y;
     }
   }
+  // ---- DRAWING FIELD
+  drawBg();
+  drawBox("#aa3300", snake.x, snake.y);
+  drawBox("#00aa00", fruit.x, fruit.y);
+  snake.tails.forEach((tail) => {
+    drawBox("#880000", tail.x, tail.y);
+  });
 
-  draw(fruit.color, fruit.x, fruit.y, CELL_SIZE, CELL_SIZE);
-  draw(snake.color, snake.x, snake.y);
-
-  rafid = requestAnimationFrame(loop);
+  rafid = requestAnimationFrame(main);
 }
 
-loop();
+main();
+
+// ---- FUNCS ----
+function clearScreen() {
+  ctx.fillStyle = "#000000";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+}
+
+function drawBg() {
+  for (let i = 0; i < GRID_SIZE; i++) {
+    for (let j = 0; j < GRID_SIZE; j++) {
+      ctx.strokeStyle = "#333333";
+      ctx.strokeRect(i * CELL_SIZE, j * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+    }
+  }
+}
+
+function drawBox(color, x, y, sx = CELL_SIZE, sy = CELL_SIZE) {
+  ctx.fillStyle = color;
+  ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, sx, sy);
+}
+
+function fruitEaten() {
+  return fruit.x === snake.x && fruit.y === snake.y;
+}
+
+function moveFruit() {
+  fruit.x = randomFreeCell()[0];
+  fruit.y = randomFreeCell()[1];
+}
+
+function addTail() {
+  const tailEnd = snake.tails.length
+    ? snake.tails[snake.tails.length - 1]
+    : snake;
+  const tail = { x: tailEnd.x, y: tailEnd.y, dir: tailEnd.dir };
+  snake.tails.push(tail);
+}
+
+function speedUp() {
+  if (interval <= 0.1) return;
+  interval -= 0.025;
+}
+
+function autoMove(item, dir) {
+  let x;
+  let y;
+  switch (dir) {
+    case "right":
+      x = 1;
+      y = 0;
+      break;
+    case "left":
+      x = -1;
+      y = 0;
+      break;
+    case "up":
+      x = 0;
+      y = -1;
+      break;
+    case "down":
+      x = 0;
+      y = 1;
+      break;
+  }
+
+  item.x += x;
+  item.y += y;
+}
+
+// TODO: not working
+function updateFreeCells() {
+  freeCells = [];
+  for (let x = 0; x < GRID_SIZE; x++) {
+    for (let y = 0; y < GRID_SIZE; y++) {
+      const occupiedCells = [snake, ...snake.tails].map((part) => {
+        return `${part.x},${part.y}`;
+      });
+
+      if (!occupiedCells.includes(`${x},${y}`)) {
+        freeCells.push([x, y]);
+      }
+    }
+  }
+}
+
+function outOfBounds(x, y) {
+  return x > GRID_SIZE - 1 || x < 0 || y > GRID_SIZE - 1 || y < 0;
+}
+
+function collisionWithTail() {
+  for (let i = 0; i < snake.tails.length; i++) {
+    const t = snake.tails[i];
+    if (snake.x === t.x && snake.y === t.y) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function randomFreeCell() {
+  const vector = freeCells[Math.floor(Math.random() * freeCells.length)];
+
+  return vector;
+}
