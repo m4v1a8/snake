@@ -10,12 +10,6 @@ const GRID_SIZE = canvas.width / CELL_SIZE;
 let interval = 0.3;
 let buttonPressed = false;
 
-let mark = {
-  x: null,
-  y: null,
-  dir: null,
-};
-
 const snake = {
   x: Math.floor(GRID_SIZE / 2),
   y: Math.floor(GRID_SIZE / 2),
@@ -35,14 +29,8 @@ let timer = 0;
 
 // movements
 window.addEventListener("keydown", (e) => {
-  const prevDir = snake.dir;
   const dir = e.key.slice(5).toLowerCase();
   snake.dir = dir;
-  if (prevDir !== dir) {
-    mark.dir = dir;
-    mark.x = snake.x;
-    mark.y = snake.y;
-  }
 });
 
 // MAIN LOOP
@@ -61,13 +49,6 @@ function main(timestamp) {
       console.log("YOU DIED!");
     } else {
       autoMove(snake, snake.dir);
-      for (let i = 0; i < snake.tails.length; i++) {
-        const tail = snake.tails[i];
-        if (tail.x === mark.x && tail.y === mark.y) {
-          tail.dir = mark.dir;
-        }
-        autoMove(tail, tail.dir);
-      }
     }
 
     if (fruitEaten()) {
