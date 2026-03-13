@@ -7,19 +7,29 @@ let rafid;
 const CELL_SIZE = 26;
 const GRID_SIZE = canvas.width / CELL_SIZE;
 
-let interval = 0.3;
+let interval = 0.5;
 let buttonPressed = false;
+let gameover = false;
+let fruitsEaten = 0;
+let freeCells = [];
 
 const snake = {
   x: Math.floor(GRID_SIZE / 2),
   y: Math.floor(GRID_SIZE / 2),
+  px: null,
+  py: null,
   dir: "right",
   tails: [],
 };
+for (let i = 0; i < 20; i++) {
+  addTail();
+}
+
+updateFreeCells(); // initailly fill the free spaces
 
 const fruit = {
-  x: randomPos(),
-  y: randomPos(),
+  x: randomFreeCell()[0],
+  y: randomFreeCell()[1],
 };
 
 let lastTime = 0;
@@ -30,7 +40,17 @@ let timer = 0;
 // movements
 window.addEventListener("keydown", (e) => {
   const dir = e.key.slice(5).toLowerCase();
+  if (buttonPressed) return;
+  const opposites = {
+    up: "down",
+    left: "right",
+    right: "left",
+    down: "up",
+  };
+  if (!dir) return;
+  if (snake.dir === opposites[dir]) return;
   snake.dir = dir;
+  buttonPressed = true;
 });
 
 // MAIN LOOP
@@ -46,22 +66,53 @@ function main(timestamp) {
   if (timer >= interval) {
     timer = 0;
     if (outOfBounds(snake.x, snake.y)) {
+      gameover = true;
       console.log("YOU DIED!");
     } else {
-      autoMove(snake, snake.dir);
+      if (!gameover) {
+        autoMove(snake, snake.dir);
+        buttonPressed = false;
+        for (let i = 0; i < snake.tails.length; i++) {
+          const t = snake.tails[i];
+          const head = i === 0 ? snake : snake.tails[i - 1];
+          t.x = head.px;
+          t.y = head.py;
+        }
+
+        if (collisionWithTail()) {
+          gameover = true;
+          console.log("You bit your own tail, you dummy");
+        }
+      }
     }
 
     if (fruitEaten()) {
+      updateFreeCells();
       moveFruit();
       addTail();
+      fruitsEaten++;
+      console.log("fruits:", fruitsEaten);
+      if (fruitsEaten > 0 && fruitsEaten % 1 === 0) {
+        console.log("speed:", interval * 100);
+        speedUp();
+      }
+    }
+
+    snake.px = snake.x;
+    snake.py = snake.y;
+
+    for (let i = 0; i < snake.tails.length; i++) {
+      const t = snake.tails[i];
+      t.px = t.x;
+      t.py = t.y;
     }
   }
   // ---- DRAWING FIELD
   drawBg();
-  drawBox("#aa0000", snake.x, snake.y);
+  drawBox("#aa3300", snake.x, snake.y);
   drawBox("#00aa00", fruit.x, fruit.y);
   snake.tails.forEach((tail) => {
-    drawBox("#aa0000", tail.x, tail.y);
+    drawBox("#880000", tail.x, tail.y);
   });
 
   rafid = requestAnimationFrame(main);
@@ -94,34 +145,21 @@ function fruitEaten() {
 }
 
 function moveFruit() {
-  fruit.x = randomPos();
-  fruit.y = randomPos();
+  fruit.x = randomFreeCell()[0];
+  fruit.y = randomFreeCell()[0];
 }
 
 function addTail() {
   const tailEnd = snake.tails.length
     ? snake.tails[snake.tails.length - 1]
     : snake;
-  const tail = { dir: tailEnd.dir };
-  switch (tailEnd.dir) {
-    case "right":
-      tail.x = tailEnd.x - 1;
-      tail.y = tailEnd.y;
-      break;
-    case "left":
-      tail.x = tailEnd.x + 1;
-      tail.y = tailEnd.y;
-      break;
-    case "up":
-      tail.x = tailEnd.x;
-      tail.y = tailEnd.y + 1;
-      break;
-    case "down":
-      tail.x = tailEnd.x;
-      tail.y = tailEnd.y - 1;
-      break;
-  }
+  const tail = { x: tailEnd.x, y: tailEnd.y, dir: tailEnd.dir };
   snake.tails.push(tail);
+}
+
+function speedUp() {
+  if (interval <= 0.1) return;
+  interval -= 0.025;
 }
 
 function autoMove(item, dir) {
@@ -150,10 +188,38 @@ function autoMove(item, dir) {
   item.y += y;
 }
 
+// TODO: not working
+function updateFreeCells() {
+  for (let y = 0; y < GRID_SIZE; y++) {
+    for (let x = 0; x < GRID_SIZE; x++) {
+      if (snake.x !== x && snake.y !== y) {
+        freeCells.push([x, y]);
+      }
+      snake.tails.forEach((tail) => {
+        if (tail.x !== x && tail.y !== y) {
+          freeCells.push([x, y]);
+        }
+      });
+    }
+  }
+}
+
 function outOfBounds(x, y) {
   return x > GRID_SIZE - 1 || x < 0 || y > GRID_SIZE - 1 || y < 0;
 }
 
-function randomPos() {
-  return Math.floor(Math.random() * GRID_SIZE);
+function collisionWithTail() {
+  for (let i = 0; i < snake.tails.length; i++) {
+    const t = snake.tails[i];
+    if (snake.x === t.x && snake.y === t.y) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function randomFreeCell() {
+  const vector = freeCells[Math.floor(Math.random() * freeCells.length)];
+
+  return vector;
 }
