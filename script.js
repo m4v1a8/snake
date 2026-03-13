@@ -6,8 +6,9 @@ canvas.height = 26 * 21;
 let rafid;
 const CELL_SIZE = 26;
 const GRID_SIZE = canvas.width / CELL_SIZE;
+const initialTail = 2;
 
-let interval = 0.5;
+let interval = 0.1;
 let buttonPressed = false;
 let gameover = false;
 let fruitsEaten = 0;
@@ -21,9 +22,6 @@ const snake = {
   dir: "right",
   tails: [],
 };
-for (let i = 0; i < 20; i++) {
-  addTail();
-}
 
 updateFreeCells(); // initailly fill the free spaces
 
@@ -39,21 +37,45 @@ let timer = 0;
 
 // movements
 window.addEventListener("keydown", (e) => {
-  const dir = e.key.slice(5).toLowerCase();
+  let dir;
   if (buttonPressed) return;
-  const opposites = {
-    up: "down",
-    left: "right",
-    right: "left",
-    down: "up",
-  };
+  console.log(e.key === "w");
+  switch (e.key) {
+    case "ArrowRight":
+    case "d":
+    case "D":
+      if (snake.dir === "left") return;
+      dir = "right";
+      break;
+    case "ArrowLeft":
+    case "a":
+    case "A":
+      if (snake.dir === "right") return;
+      dir = "left";
+      break;
+    case "ArrowUp":
+    case "w":
+    case "W":
+      if (snake.dir === "down") return;
+      dir = "up";
+      break;
+    case "ArrowDown":
+    case "s":
+    case "S":
+      if (snake.dir === "up") return;
+      dir = "down";
+      console.log("changed");
+      break;
+  }
+
   if (!dir) return;
-  if (snake.dir === opposites[dir]) return;
-  snake.dir = dir;
+
   buttonPressed = true;
+  snake.dir = dir;
 });
 
 // MAIN LOOP
+let loopCount = 0;
 function main(timestamp) {
   clearScreen();
   // ---- DELTA TIME
@@ -62,6 +84,7 @@ function main(timestamp) {
   if (dt) {
     timer += dt;
   }
+
   // ---- LOGICS
   if (timer >= interval) {
     timer = 0;
@@ -83,17 +106,20 @@ function main(timestamp) {
           gameover = true;
           console.log("You bit your own tail, you dummy");
         }
+
+        if (loopCount < initialTail) {
+          addTail();
+          loopCount++;
+        }
       }
     }
 
     if (fruitEaten()) {
+      addTail();
       updateFreeCells();
       moveFruit();
-      addTail();
       fruitsEaten++;
-      console.log("fruits:", fruitsEaten);
       if (fruitsEaten > 0 && fruitsEaten % 1 === 0) {
-        console.log("speed:", interval * 100);
         speedUp();
       }
     }
@@ -146,7 +172,7 @@ function fruitEaten() {
 
 function moveFruit() {
   fruit.x = randomFreeCell()[0];
-  fruit.y = randomFreeCell()[0];
+  fruit.y = randomFreeCell()[1];
 }
 
 function addTail() {
@@ -190,16 +216,16 @@ function autoMove(item, dir) {
 
 // TODO: not working
 function updateFreeCells() {
-  for (let y = 0; y < GRID_SIZE; y++) {
-    for (let x = 0; x < GRID_SIZE; x++) {
-      if (snake.x !== x && snake.y !== y) {
+  freeCells = [];
+  for (let x = 0; x < GRID_SIZE; x++) {
+    for (let y = 0; y < GRID_SIZE; y++) {
+      const occupiedCells = [snake, ...snake.tails].map((part) => {
+        return `${part.x},${part.y}`;
+      });
+
+      if (!occupiedCells.includes(`${x},${y}`)) {
         freeCells.push([x, y]);
       }
-      snake.tails.forEach((tail) => {
-        if (tail.x !== x && tail.y !== y) {
-          freeCells.push([x, y]);
-        }
-      });
     }
   }
 }
