@@ -6,10 +6,36 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Document</title>
 </head>
+<style>
+  body {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+  }
+
+  .scoreboard {
+    background-color: burlywood;
+    padding: 1rem;
+
+    .fruit-score,
+    .speed {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      text-align: center;
+    }
+  }
+
+  canvas {
+    display: block;
+  }
+</style>
 
 <body>
+  <div class="scoreboard">
+    <p class="fruit-score"><span>Fruits:</span> <span id="fruits-count">0</span></p>
+    <p class="speed"><span>Speed:</span> <span id="speed-count">0</span></p>
+  </div>
   <canvas></canvas>
-
   <script src="./script.js"></script>
 </body>
 
